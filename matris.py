@@ -9,6 +9,7 @@ from tetrominoes import list_of_tetrominoes
 from tetrominoes import rotate
 
 from scores import load_score, write_score
+from datetime import datetime
 
 class BrokenMatrixException(Exception):
     pass
@@ -16,6 +17,13 @@ class BrokenMatrixException(Exception):
 
 def get_sound(filename):
     return pygame.mixer.Sound(os.path.join(os.path.dirname(__file__), "resources", filename))
+
+logger_count = {}
+
+def logger(message):
+    now = datetime.now().strftime('%H:%M:%S')
+    logger_count[message] = logger_count.get(message, 0) + 1
+    print now + ' |INFO| NO.%s %s' % (logger_count.get(message, 0), message)
 
 BGCOLOR = (15, 15, 20)
 BORDERCOLOR = (140, 140, 140)
@@ -93,44 +101,34 @@ class Matris(object):
         self.lock_tetromino()
         self.score += 10*amount
 
-    def update(self, timepassed):
-        pressed = lambda key: event.type == pygame.KEYDOWN and event.key == key
-        unpressed = lambda key: event.type == pygame.KEYUP and event.key == key
+    def update(self, timepassed, action):
 
-        events = pygame.event.get()
-        
-        for event in events:
-            if pressed(pygame.K_p):
-                self.surface.fill((0,0,0))
-                self.paused = not self.paused
-            elif event.type == pygame.QUIT:
-                self.prepare_and_execute_gameover(playsound=False)
-                exit()
-            elif pressed(pygame.K_ESCAPE):
-                self.prepare_and_execute_gameover(playsound=False)
-
+        if action == 'p':
+            self.surface.fill((0,0,0))
+            self.paused = not self.paused
+        elif action == 'quit':
+            self.prepare_and_execute_gameover(playsound=False)
+            return True
         if self.paused:
             return
 
-        for event in events:
-            if pressed(pygame.K_SPACE):
-                self.hard_drop()
-            elif pressed(pygame.K_UP) or pressed(pygame.K_w):
-                self.request_rotation()
-
-            elif pressed(pygame.K_LEFT) or pressed(pygame.K_a):
-                self.request_movement('left')
-                self.movement_keys['left'] = 1
-            elif pressed(pygame.K_RIGHT) or pressed(pygame.K_d):
-                self.request_movement('right')
-                self.movement_keys['right'] = 1
-
-            elif unpressed(pygame.K_LEFT) or unpressed(pygame.K_a):
-                self.movement_keys['left'] = 0
-                self.movement_keys_timer = (-self.movement_keys_speed)*2
-            elif unpressed(pygame.K_RIGHT) or unpressed(pygame.K_d):
-                self.movement_keys['right'] = 0
-                self.movement_keys_timer = (-self.movement_keys_speed)*2
+        if action == 'w':
+            self.hard_drop()
+        elif action == 'j':
+            self.request_rotation()
+        elif action == 'a':
+            self.request_movement('left')
+            self.movement_keys['left'] = 1
+        elif action == 'd':
+            self.request_movement('right')
+            self.movement_keys['right'] = 1
+        #
+        # elif unpressed(pygame.K_LEFT) or unpressed(pygame.K_a):
+        #     self.movement_keys['left'] = 0
+        #     self.movement_keys_timer = (-self.movement_keys_speed)*2
+        # elif unpressed(pygame.K_RIGHT) or unpressed(pygame.K_d):
+        #     self.movement_keys['right'] = 0
+        #     self.movement_keys_timer = (-self.movement_keys_speed)*2
 
 
 
@@ -156,9 +154,9 @@ class Matris(object):
 
         if any(self.movement_keys.values()):
             self.movement_keys_timer += timepassed
-        if self.movement_keys_timer > self.movement_keys_speed:
-            self.request_movement('right' if self.movement_keys['right'] else 'left')
-            self.movement_keys_timer %= self.movement_keys_speed
+        # if self.movement_keys_timer > self.movement_keys_speed:
+        #     self.request_movement('right' if self.movement_keys['right'] else 'left')
+        #     self.movement_keys_timer %= self.movement_keys_speed
 
         with_shadow = self.place_shadow()
 
@@ -180,6 +178,7 @@ class Matris(object):
                         self.surface.fill(BGCOLOR, block_location)
                     
                     self.surface.blit(with_tetromino[(y,x)][1], block_location)
+        return False
                     
     def prepare_and_execute_gameover(self, playsound=True):
         if playsound:
@@ -230,7 +229,11 @@ class Matris(object):
     def request_movement(self, direction):
         posY, posX = self.tetromino_position
         if direction == 'left' and self.blend(position=(posY, posX-1)):
+            logger('Enter Left')
+            logger('Before X: %s, Y: %s' % (posX, posY))
             self.tetromino_position = (posY, posX-1)
+            logger('After X: %s, Y: %s' % self.tetromino_position)
+
             return self.tetromino_position
         elif direction == 'right' and self.blend(position=(posY, posX+1)):
             self.tetromino_position = (posY, posX+1)
@@ -281,6 +284,9 @@ class Matris(object):
 
         return border
 
+    """
+    When the block drop to bottom, lock it from receiving any option. 
+    """
     def lock_tetromino(self):
         self.matrix = self.blend()
         if not self.matrix:
@@ -308,6 +314,7 @@ class Matris(object):
         self.set_tetrominoes()
         return True
 
+    # When the whole line is full, remove the line.
     def remove_lines(self):
         lines = []
         for y in range(self.size['height']):
@@ -328,6 +335,7 @@ class Matris(object):
         return len(lines)
 
     def blend(self, shape=None, position=None, matrix=None, block=None, allow_failure=True, shadow=False):
+        # logger('Enter blend')
         if shape is None:
             shape = self.rotated()
         if position is None:
@@ -362,39 +370,45 @@ class Matris(object):
         return surf
 
 class Game(object):
-    def main(self, screen):
-        clock = pygame.time.Clock()
-        background = Surface(screen.get_size())
-
-        background.blit(construct_nightmare(background.get_size()), (0,0))
-
+    def __init__(self, screen):
+        self.done = False
+        self.screen = screen
+        self.init_background()
         self.matris = Matris()
-        matris_border = Surface((MATRIX_WIDTH*BLOCKSIZE+BORDERWIDTH*2, VISIBLE_MATRIX_HEIGHT*BLOCKSIZE+BORDERWIDTH*2))
-        matris_border.fill(BORDERCOLOR)
+        self.fill_screen()
+        self.step('p')
 
-        while 1:
-            dt = clock.tick(45)
+    def init_background(self):
+        self.background = Surface(self.screen.get_size())
+        self.background.blit(construct_nightmare(self.background.get_size()), (0, 0))
 
-            self.matris.update((dt / 1000.) if not self.matris.paused else 0)
-            if self.matris.gameover:
-                return
-
-            tricky_centerx = WIDTH-(WIDTH-(MATRIS_OFFSET+BLOCKSIZE*MATRIX_WIDTH+BORDERWIDTH*2))/2
-
-            background.blit(matris_border, (MATRIS_OFFSET,MATRIS_OFFSET))
-            background.blit(self.matris.surface, (MATRIS_OFFSET+BORDERWIDTH, MATRIS_OFFSET+BORDERWIDTH))
-
-            nextts = self.next_tetromino_surf(self.matris.surface_of_next_tetromino)
-            background.blit(nextts, nextts.get_rect(top=MATRIS_OFFSET, centerx=tricky_centerx))
-
-            infos = self.info_surf()
-            background.blit(infos, infos.get_rect(bottom=HEIGHT-MATRIS_OFFSET, centerx=tricky_centerx))
+    def fill_screen(self):
+        self.matris_border = Surface((MATRIX_WIDTH*BLOCKSIZE+BORDERWIDTH*2, VISIBLE_MATRIX_HEIGHT*BLOCKSIZE+BORDERWIDTH*2))
+        self.matris_border.fill(BORDERCOLOR)
 
 
-            screen.blit(background, (0, 0))
 
-            pygame.display.flip()
-    
+    def step(self, action):
+        self.matris.update(1, action)
+        if self.matris.gameover:
+            self.done = True
+            return self.matris.score, self.matris.lines, self.matris.combo
+
+        tricky_centerx = WIDTH - (WIDTH - (MATRIS_OFFSET + BLOCKSIZE * MATRIX_WIDTH + BORDERWIDTH * 2)) / 2
+
+        self.background.blit(self.matris_border, (MATRIS_OFFSET, MATRIS_OFFSET))
+        self.background.blit(self.matris.surface, (MATRIS_OFFSET + BORDERWIDTH, MATRIS_OFFSET + BORDERWIDTH))
+
+        self.nextts = self.next_tetromino_surf(self.matris.surface_of_next_tetromino)
+        self.background.blit(self.nextts, self.nextts.get_rect(top=MATRIS_OFFSET, centerx=tricky_centerx))
+
+        self.infos = self.info_surf()
+        self.background.blit(self.infos, self.infos.get_rect(bottom=HEIGHT - MATRIS_OFFSET, centerx=tricky_centerx))
+
+        self.screen.blit(self.background, (0, 0))
+
+        pygame.display.flip()
+        return self.matris.score, self.matris.lines, self.matris.combo
 
     def info_surf(self):
 
@@ -447,43 +461,6 @@ class Game(object):
 
         return area
 
-class Menu(object):
-    running = True
-    def main(self, screen):
-        clock = pygame.time.Clock()
-        menu = kezmenu.KezMenu(
-            ['Play!', lambda: Game().main(screen)],
-            ['Quit', lambda: setattr(self, 'running', False)],
-        )
-        menu.position = (50, 50)
-        menu.enableEffect('enlarge-font-on-focus', font=None, size=60, enlarge_factor=1.2, enlarge_time=0.3)
-        menu.color = (255,255,255)
-        menu.focus_color = (40, 200, 40)
-
-        nightmare = construct_nightmare(screen.get_size())
-        highscoresurf = self.construct_highscoresurf()
-
-        timepassed = clock.tick(30) / 1000.
-
-        while self.running:
-            events = pygame.event.get()
-
-            for event in events:
-                if event.type == pygame.QUIT:
-                    exit()
-
-            menu.update(events, timepassed)
-
-            timepassed = clock.tick(30) / 1000.
-
-            if timepassed > 1: # A game has most likely been played 
-                highscoresurf = self.construct_highscoresurf()
-
-            screen.blit(nightmare, (0,0))
-            screen.blit(highscoresurf, highscoresurf.get_rect(right=WIDTH-50, bottom=HEIGHT-50))
-            menu.draw(screen)
-            pygame.display.flip()
-
     def construct_highscoresurf(self):
         font = pygame.font.Font(None, 50)
         highscore = load_score()
@@ -514,4 +491,14 @@ if __name__ == '__main__':
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("MaTris")
-    Menu().main(screen)
+    env = Game(screen)
+    while True:
+        action = raw_input("action: ")
+        logger('Score: %s\tLines: %s\tCombo:%s' % env.step(action))
+        if env.done:
+            start_new = raw_input('New Game(y/n)?')
+            if start_new == 'y':
+                env = Game(screen)
+            else:
+                pygame.quit()
+                break
