@@ -14,10 +14,6 @@ from datetime import datetime
 class BrokenMatrixException(Exception):
     pass
 
-
-def get_sound(filename):
-    return pygame.mixer.Sound(os.path.join(os.path.dirname(__file__), "resources", filename))
-
 logger_count = {}
 
 def logger(message):
@@ -76,12 +72,6 @@ class Matris(object):
 
         self.highscore = load_score()
         self.played_highscorebeaten_sound = False
-
-        self.levelup_sound  = get_sound("levelup.wav")
-        self.gameover_sound = get_sound("gameover.wav")
-        self.linescleared_sound = get_sound("linecleared.wav")
-        self.highscorebeaten_sound = get_sound("highscorebeaten.wav")
-
 
     def set_tetrominoes(self):
         self.current_tetromino = self.next_tetromino
@@ -181,8 +171,6 @@ class Matris(object):
         return False
                     
     def prepare_and_execute_gameover(self, playsound=True):
-        if playsound:
-            self.gameover_sound.play()
         write_score(self.score)
         self.gameover = True
 
@@ -296,17 +284,12 @@ class Matris(object):
         self.lines += lines_cleared
 
         if lines_cleared:
-            if lines_cleared >= 4:
-                self.linescleared_sound.play()
             self.score += 100 * (lines_cleared**2) * self.combo
 
             if not self.played_highscorebeaten_sound and self.score > self.highscore:
-                if self.highscore != 0:
-                    self.highscorebeaten_sound.play()
                 self.played_highscorebeaten_sound = True
 
         if self.lines >= self.level*10:
-            self.levelup_sound.play()
             self.level += 1
 
         self.combo = self.combo + 1 if lines_cleared else 1
@@ -370,13 +353,18 @@ class Matris(object):
         return surf
 
 class Game(object):
-    def __init__(self, screen):
+    def __init__(self):
+        pygame.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("MaTris")
         self.done = False
         self.screen = screen
         self.init_background()
         self.matris = Matris()
         self.fill_screen()
-        self.step('p')
+        self.step('e')
+        self.n_actions = 4
+        self.n_features = 3
 
     def init_background(self):
         self.background = Surface(self.screen.get_size())
@@ -467,6 +455,25 @@ class Game(object):
         text = "Highscore: {}".format(highscore)
         return font.render(text, True, (255,255,255))
 
+    def reset(self):
+        self.__init__()
+
+    def destroy(self):
+        pygame.quit()
+
+    def get_matrix_state(self):
+        matrix_list = []
+        for y in range(MATRIX_HEIGHT):
+            x_matrix = []
+            for x in range(MATRIX_WIDTH):
+                if self.matris.matrix[(y, x)] is not None:
+                    x_matrix.append(1)
+                else:
+                    x_matrix.append(0)
+            matrix_list.append(x_matrix)
+        for i in range(len(matrix_list)):
+            print matrix_list[i]
+
 def construct_nightmare(size):
     surf = Surface(size)
 
@@ -488,17 +495,15 @@ def construct_nightmare(size):
 
 
 if __name__ == '__main__':
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("MaTris")
-    env = Game(screen)
+    env = Game()
     while True:
         action = raw_input("action: ")
+        env.get_matrix_state()
         logger('Score: %s\tLines: %s\tCombo:%s' % env.step(action))
         if env.done:
             start_new = raw_input('New Game(y/n)?')
             if start_new == 'y':
-                env = Game(screen)
+                env = Game()
             else:
                 pygame.quit()
                 break
