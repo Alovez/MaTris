@@ -50,4 +50,3 @@ if __name__ == "__main__":
     env.after(100, run_maze)
     env.mainloop()
     RL.plot_cost()
-

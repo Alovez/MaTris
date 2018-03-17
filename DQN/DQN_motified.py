@@ -156,4 +156,3 @@ class DeepQNetwork:
 
 if __name__ == '__main__':
     DQN = DeepQNetwork(3, 4, output_graph=True)
-

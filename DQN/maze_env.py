@@ -11,12 +11,13 @@ View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 import numpy as np
 import time
 import sys
+
 if sys.version_info.major == 2:
     import Tkinter as tk
 else:
     import tkinter as tk
 
-UNIT = 40   # pixels
+UNIT = 40  # pixels
 MAZE_H = 4  # grid height
 MAZE_W = 4  # grid width
 
@@ -33,8 +34,8 @@ class Maze(tk.Tk, object):
 
     def _build_maze(self):
         self.canvas = tk.Canvas(self, bg='white',
-                           height=MAZE_H * UNIT,
-                           width=MAZE_W * UNIT)
+                                height=MAZE_H * UNIT,
+                                width=MAZE_W * UNIT)
 
         # create grids
         for c in range(0, MAZE_W * UNIT, UNIT):
@@ -86,21 +87,22 @@ class Maze(tk.Tk, object):
             origin[0] + 15, origin[1] + 15,
             fill='red')
         # return observation
-        return (np.array(self.canvas.coords(self.rect)[:2]) - np.array(self.canvas.coords(self.oval)[:2]))/(MAZE_H*UNIT)
+        return (np.array(self.canvas.coords(self.rect)[:2]) - np.array(self.canvas.coords(self.oval)[:2])) / (
+        MAZE_H * UNIT)
 
     def step(self, action):
         s = self.canvas.coords(self.rect)
         base_action = np.array([0, 0])
-        if action == 0:   # up
+        if action == 0:  # up
             if s[1] > UNIT:
                 base_action[1] -= UNIT
-        elif action == 1:   # down
+        elif action == 1:  # down
             if s[1] < (MAZE_H - 1) * UNIT:
                 base_action[1] += UNIT
-        elif action == 2:   # right
+        elif action == 2:  # right
             if s[0] < (MAZE_W - 1) * UNIT:
                 base_action[0] += UNIT
-        elif action == 3:   # left
+        elif action == 3:  # left
             if s[0] > UNIT:
                 base_action[0] -= UNIT
 
@@ -118,10 +120,9 @@ class Maze(tk.Tk, object):
         else:
             reward = 0
             done = False
-        s_ = (np.array(next_coords[:2]) - np.array(self.canvas.coords(self.oval)[:2]))/(MAZE_H*UNIT)
+        s_ = (np.array(next_coords[:2]) - np.array(self.canvas.coords(self.oval)[:2])) / (MAZE_H * UNIT)
         return s_, reward, done
 
     def render(self):
         # time.sleep(0.01)
         self.update()
-
