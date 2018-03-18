@@ -1,6 +1,9 @@
 from maze_env import Maze
-from RL_brain import DeepQNetwork
+from DQN_modified import DeepQNetwork
 from game.matris import Game
+
+
+action_map = ['a', 's', 'd', 'j']
 
 def run_maze():
     step = 0
@@ -43,8 +46,8 @@ def run_matris():
 
         while True:
             action = RL.choose_action(observation)
-
-            observation_, reward, done = env.step(action)
+            print action
+            observation_, reward, done = env.step(action_map[action % env.n_actions])
             RL.store_transition(observation, action, reward, observation_)
             if (step > 3000) and (step % 20 == 0):
                 RL.learn()
@@ -58,10 +61,11 @@ def run_matris():
 if __name__ == "__main__":
     # maze game
     env = Game()
-    RL = DeepQNetwork(env.n_actions, env.n_features,
+
+    RL = DeepQNetwork(env.n_actions, env.n_features_x[0], env.n_features_y,
                       learning_rate=0.01,
                       reward_decay=0.9,
-                      e_greedy=0.9,
+                      e_greedy=0.5,
                       replace_target_iter=200,
                       memory_size=5000,
                       output_graph=True

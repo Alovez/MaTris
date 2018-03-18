@@ -124,3 +124,9 @@ class Maze(tk.Tk, object):
     def render(self):
         # time.sleep(0.01)
         self.update()
+
+if __name__ == '__main__':
+    mz = Maze()
+    print mz.reset()
+    print mz.step(1)
+    mz.render()

@@ -18,18 +18,20 @@ class DeepQNetwork:
     def __init__(
             self,
             n_actions,
-            n_features,
+            n_features_x,
+            n_features_y,
             learning_rate=0.01,
             reward_decay=0.9,
             e_greedy=0.9,
             replace_target_iter=300,
             memory_size=500,
-            batch_size=32,
+            batch_size=50,
             e_greedy_increment=None,
             output_graph=False,
     ):
         self.n_actions = n_actions
-        self.n_features = n_features
+        self.n_features_x = n_features_x
+        self.n_features_y = n_features_y
         self.lr = learning_rate
         self.gamma = reward_decay
         self.epsilon_max = e_greedy
@@ -43,7 +45,7 @@ class DeepQNetwork:
         self.learn_step_counter = 0
 
         # initialize zero memory [s, a, r, s_]
-        self.memory = np.zeros((self.memory_size, n_features * 2 + 2))
+        self.memory = np.zeros((self.memory_size, n_features_y * n_features_x * 2 + 2))
 
         # consist of [target_net, evaluate_net]
         self._build_net()
@@ -58,40 +60,54 @@ class DeepQNetwork:
 
         if output_graph:
             # $ tensorboard --logdir=logs
-            tf.summary.FileWriter("logs/", self.sess.graph)
+            tf.summary.FileWriter("./logs/", self.sess.graph)
 
         self.sess.run(tf.global_variables_initializer())
         self.cost_his = []
 
     def _build_net(self):
         # ------------------ all inputs ------------------------
-        self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input State
-        self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')  # input Next State
+        self.s = tf.placeholder(tf.float32, [1, self.n_features_y, self.n_features_x], name='s')  # input State
+        self.s_ = tf.placeholder(tf.float32, [1, self.n_features_y, self.n_features_x], name='s_')  # input Next State
         self.r = tf.placeholder(tf.float32, [None, ], name='r')  # input Reward
         self.a = tf.placeholder(tf.int32, [None, ], name='a')  # input Action
 
-        w_initializer, b_initializer = tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)
+        w_initializer, b_initializer = tf.random_normal_initializer(0., 0.5), tf.constant_initializer(0.1)
 
         # ------------------ build evaluate_net ------------------
         with tf.variable_scope('eval_net'):
-            e1 = tf.layers.dense(self.s, 20, tf.nn.relu, kernel_initializer=w_initializer,
+            e1 = tf.layers.dense(self.s, self.n_features_x * self.n_features_y, tf.nn.relu,
+                                 kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='e1')
-            self.q_eval = tf.layers.dense(e1, self.n_actions, kernel_initializer=w_initializer,
+            e2 = tf.layers.dense(e1, self.n_features_x, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='e2')
+            e3 = tf.layers.dense(e2, self.n_features_y, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='e3')
+            e4 = tf.layers.dense(e3, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='e4')
+            self.q_eval = tf.layers.dense(e4, self.n_actions, kernel_initializer=w_initializer,
                                           bias_initializer=b_initializer, name='q')
 
         # ------------------ build target_net ------------------
         with tf.variable_scope('target_net'):
-            t1 = tf.layers.dense(self.s_, 20, tf.nn.relu, kernel_initializer=w_initializer,
+            t1 = tf.layers.dense(self.s_, self.n_features_x * self.n_features_y, tf.nn.relu,
+                                 kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='t1')
-            self.q_next = tf.layers.dense(t1, self.n_actions, kernel_initializer=w_initializer,
-                                          bias_initializer=b_initializer, name='t2')
+            t2 = tf.layers.dense(t1, self.n_features_x, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='t2')
+            t3 = tf.layers.dense(t2, self.n_features_y, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='t3')
+            t4 = tf.layers.dense(t3, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer, name='t4')
+            self.q_next = tf.layers.dense(t4, self.n_actions, kernel_initializer=w_initializer,
+                                          bias_initializer=b_initializer, name='t5')
 
         with tf.variable_scope('q_target'):
-            q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')    # shape=(None, )
+            q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')  # shape=(None, )
             self.q_target = tf.stop_gradient(q_target)
         with tf.variable_scope('q_eval'):
             a_indices = tf.stack([tf.range(tf.shape(self.a)[0], dtype=tf.int32), self.a], axis=1)
-            self.q_eval_wrt_a = tf.gather_nd(params=self.q_eval, indices=a_indices)    # shape=(None, )
+            self.q_eval_wrt_a = tf.gather_nd(params=self.q_eval, indices=a_indices)  # shape=(None, )
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval_wrt_a, name='TD_error'))
         with tf.variable_scope('train'):
@@ -100,7 +116,9 @@ class DeepQNetwork:
     def store_transition(self, s, a, r, s_):
         if not hasattr(self, 'memory_counter'):
             self.memory_counter = 0
-        transition = np.hstack((s, [a, r], s_))
+        stack = np.column_stack((s, s_))
+        stack = np.insert(stack.reshape(1, -1), 0, (a, r))
+        transition = np.hstack(stack)
         # replace the old memory with new memory
         index = self.memory_counter % self.memory_size
         self.memory[index, :] = transition
@@ -130,14 +148,16 @@ class DeepQNetwork:
         else:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         batch_memory = self.memory[sample_index, :]
-
+        a = batch_memory[0]
+        r = batch_memory[1]
+        s, s_ = np.split(batch_memory[2:].reshape(self.n_features_y, self.n_features_x), 2, 1)
         _, cost = self.sess.run(
             [self._train_op, self.loss],
             feed_dict={
-                self.s: batch_memory[:, :self.n_features],
-                self.a: batch_memory[:, self.n_features],
-                self.r: batch_memory[:, self.n_features + 1],
-                self.s_: batch_memory[:, -self.n_features:],
+                self.s: s,
+                self.a: a,
+                self.r: r,
+                self.s_: s_,
             })
 
         self.cost_his.append(cost)
@@ -153,5 +173,6 @@ class DeepQNetwork:
         plt.xlabel('training steps')
         plt.show()
 
+
 if __name__ == '__main__':
-    DQN = DeepQNetwork(3,4, output_graph=True)
+    DQN = DeepQNetwork(3, 4, 5, output_graph=True)

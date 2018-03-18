@@ -4,6 +4,7 @@ from pygame import Rect, Surface
 import random
 import os
 import kezmenu
+import numpy as np
 
 from tetrominoes import list_of_tetrominoes
 from tetrominoes import rotate
@@ -20,6 +21,16 @@ def logger(message):
     now = datetime.now().strftime('%H:%M:%S')
     logger_count[message] = logger_count.get(message, 0) + 1
     print now + ' |INFO| NO.%s %s' % (logger_count.get(message, 0), message)
+
+tetrominoes_dict = {
+    'long': 0,
+    'square': 1,
+    'hat': 2,
+    'right_snake': 3,
+    'left_snake': 4,
+    'left_gun': 5,
+    'right_gun': 6
+}
 
 BGCOLOR = (15, 15, 20)
 BORDERCOLOR = (140, 140, 140)
@@ -364,7 +375,8 @@ class Game(object):
         self.fill_screen()
         self.step('e')
         self.n_actions = 4
-        self.n_features = 3
+        self.n_features_x = MATRIX_WIDTH,
+        self.n_features_y = MATRIX_HEIGHT
 
     def init_background(self):
         self.background = Surface(self.screen.get_size())
@@ -377,10 +389,9 @@ class Game(object):
 
 
     def step(self, action):
-        self.matris.update(1, action)
+        self.matris.update(0.5, action)
         if self.matris.gameover:
             self.done = True
-            return self.matris.score, self.matris.lines, self.matris.combo
 
         tricky_centerx = WIDTH - (WIDTH - (MATRIS_OFFSET + BLOCKSIZE * MATRIX_WIDTH + BORDERWIDTH * 2)) / 2
 
@@ -396,7 +407,7 @@ class Game(object):
         self.screen.blit(self.background, (0, 0))
 
         pygame.display.flip()
-        return self.matris.score, self.matris.lines, self.matris.combo
+        return self.get_matrix_state(), self.matris.lines, self.done
 
     def info_surf(self):
 
@@ -457,6 +468,7 @@ class Game(object):
 
     def reset(self):
         self.__init__()
+        return self.get_matrix_state()
 
     def destroy(self):
         pygame.quit()
@@ -466,13 +478,26 @@ class Game(object):
         for y in range(MATRIX_HEIGHT):
             x_matrix = []
             for x in range(MATRIX_WIDTH):
-                if self.matris.matrix[(y, x)] is not None:
+                if self.matris.matrix and self.matris.matrix[(y, x)] is not None:
                     x_matrix.append(1)
                 else:
                     x_matrix.append(0)
             matrix_list.append(x_matrix)
-        for i in range(len(matrix_list)):
-            print matrix_list[i]
+        # Add current tetromino into matrix
+        if self.matris.current_tetromino is not None:
+            current_tetromino = self.matris.current_tetromino
+            current_pos = self.matris.tetromino_position
+            current_rotation = self.matris.tetromino_rotation
+            shape = rotate(current_tetromino.shape, current_rotation)
+            for y in range(len(shape)):
+                for x in range(len(shape[0])):
+                    if shape[y][x] is not None:
+                        matrix_list[current_pos[0] + y][current_pos[1] + x] = 1
+            for i in range(len(matrix_list)):
+                print matrix_list[i]
+            print '=============================='
+        matrix_array = np.array(matrix_list)
+        return matrix_array
 
 def construct_nightmare(size):
     surf = Surface(size)
