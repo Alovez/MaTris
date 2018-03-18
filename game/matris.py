@@ -228,11 +228,7 @@ class Matris(object):
     def request_movement(self, direction):
         posY, posX = self.tetromino_position
         if direction == 'left' and self.blend(position=(posY, posX-1)):
-            logger('Enter Left')
-            logger('Before X: %s, Y: %s' % (posX, posY))
             self.tetromino_position = (posY, posX-1)
-            logger('After X: %s, Y: %s' % self.tetromino_position)
-
             return self.tetromino_position
         elif direction == 'right' and self.blend(position=(posY, posX+1)):
             self.tetromino_position = (posY, posX+1)
@@ -373,7 +369,8 @@ class Game(object):
         self.init_background()
         self.matris = Matris()
         self.fill_screen()
-        self.step('e')
+        self.matris.update(0.1, 'e')
+        self.n_actions_step = 6
         self.n_actions = 4
         self.n_features_x = MATRIX_WIDTH,
         self.n_features_y = MATRIX_HEIGHT
@@ -389,7 +386,9 @@ class Game(object):
 
 
     def step(self, action):
-        self.matris.update(0.5, action)
+        for a in action:
+            self.matris.update(0.1, a)
+        self.matris.update(0.1, 'w')
         if self.matris.gameover:
             self.done = True
 
@@ -493,9 +492,9 @@ class Game(object):
                 for x in range(len(shape[0])):
                     if shape[y][x] is not None:
                         matrix_list[current_pos[0] + y][current_pos[1] + x] = 1
-            for i in range(len(matrix_list)):
-                print matrix_list[i]
-            print '=============================='
+            # for i in range(len(matrix_list)):
+            #     print matrix_list[i]
+            # print '=============================='
         matrix_array = np.array(matrix_list)
         return matrix_array
 
