@@ -369,8 +369,7 @@ class Game(object):
         self.init_background()
         self.matris = Matris()
         self.fill_screen()
-        self.matris.update(0.1, 'e')
-        self.n_actions_step = 6
+        self.step('e')
         self.n_actions = 4
         self.n_features_x = MATRIX_WIDTH,
         self.n_features_y = MATRIX_HEIGHT
@@ -386,9 +385,7 @@ class Game(object):
 
 
     def step(self, action):
-        for a in action:
-            self.matris.update(0.1, a)
-        self.matris.update(0.1, 'w')
+        self.matris.update(0.3, action)
         if self.matris.gameover:
             self.done = True
 

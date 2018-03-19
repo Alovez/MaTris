@@ -31,7 +31,6 @@ class DeepQNetwork:
             output_graph=False,
     ):
         self.n_actions = n_actions
-        self.n_actions_step = n_actions_step
         self.n_features_x = n_features_x
         self.n_features_y = n_features_y
         self.lr = learning_rate
@@ -72,7 +71,7 @@ class DeepQNetwork:
         self.s = tf.placeholder(tf.float32, [None, self.n_features_y, self.n_features_x], name='s')  # input State
         self.s_ = tf.placeholder(tf.float32, [None, self.n_features_y, self.n_features_x], name='s_')  # input Next State
         self.r = tf.placeholder(tf.float32, [None, ], name='r')  # input Reward
-        self.a = tf.placeholder(tf.int32, [None, self.n_actions], name='a')  # input Action
+        self.a = tf.placeholder(tf.int32, [None, ], name='a')  # input Action
 
         w_initializer, b_initializer = tf.random_normal_initializer(0., 0.5), tf.random_normal_initializer(.0, 0.9)
 
@@ -87,9 +86,7 @@ class DeepQNetwork:
                                  bias_initializer=b_initializer, name='e3')
             e4 = tf.layers.dense(e3, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='e4')
-            e5 = tf.layers.dense(e4, self.n_actions_step, tf.nn.relu, kernel_initializer=w_initializer,
-                                 bias_initializer=b_initializer, name='e5')
-            self.q_eval = tf.layers.dense(e5, self.n_actions, kernel_initializer=w_initializer,
+            self.q_eval = tf.layers.dense(e4, self.n_actions, kernel_initializer=w_initializer,
                                           bias_initializer=b_initializer, name='q')
 
         # ------------------ build target_net ------------------
@@ -103,12 +100,10 @@ class DeepQNetwork:
                                  bias_initializer=b_initializer, name='t3')
             t4 = tf.layers.dense(t3, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='t4')
-            t5 = tf.layers.dense(t4, self.n_actions_step, tf.nn.relu, kernel_initializer=w_initializer,
-                                 bias_initializer=b_initializer, name='t5')
-            self.q_next = tf.layers.dense(t5, self.n_actions, kernel_initializer=w_initializer,
+            self.q_next = tf.layers.dense(t4, self.n_actions, kernel_initializer=w_initializer,
                                           bias_initializer=b_initializer, name='t5')
         with tf.variable_scope('q_target'):
-            q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')  # shape=(?, 6)
+            q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')  # shape=(?, 2)
             self.q_target = tf.stop_gradient(q_target)
         with tf.variable_scope('q_eval'):
             a_indices = tf.stack([tf.range(tf.shape(self.a)[0], dtype=tf.int32), self.a], axis=1)
@@ -138,7 +133,7 @@ class DeepQNetwork:
             actions_value = self.sess.run(self.q_eval, feed_dict={self.s: observation})
             action = np.argmax(actions_value)
         else:
-            action = np.random.choice([0,0,2,2,1,3,3], self.n_actions)[0]
+            action = np.random.choice([0,0,2,2,1,3,3], 1)[0]
         return action
 
     def learn(self):
@@ -153,20 +148,15 @@ class DeepQNetwork:
         else:
             sample_index = np.random.choice(self.memory_counter, size=self.batch_size)
         batch_memory = self.memory[sample_index, :]
-        fa = batch_memory[:, 0:self.n_actions]
-        fr = batch_memory[:, self.n_actions]
-        ss_list = batch_memory[:, self.n_actions + 1:]
+        fa = batch_memory[:, 0]
+        fr = batch_memory[:, 1]
+        ss_list = batch_memory[:, 2:]
         ss_reshape = [x.reshape((self.n_features_y, self.n_features_x * 2)) for x in ss_list]
         fs, fs_ = [], []
         for x in ss_reshape:
             t, t_ = np.split(x, 2, 1)
             fs.append(t)
             fs_.append(t_)
-            # import ipdb;ipdb.set_trace()
-        print np.shape(fa)
-        print np.shape(fr)
-        print np.shape(fs)
-        print np.shape(fs_)
         _, cost = self.sess.run(
             [self._train_op, self.loss],
             feed_dict={
