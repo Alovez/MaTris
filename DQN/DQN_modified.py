@@ -124,6 +124,12 @@ class DeepQNetwork:
         self.memory[index, :] = transition
         self.memory_counter += 1
 
+    def save_memory(self):
+        np.savetxt('ActionMemory.txt', self.memory)
+
+    def load_memory(self):
+        self.memory = np.loadtxt('ActionMemory.txt')
+
     def choose_action(self, observation):
         # to have batch dimension when feed into tf placeholder
         observation = observation[np.newaxis, :]
