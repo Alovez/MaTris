@@ -370,7 +370,7 @@ class Game(object):
         self.matris = Matris()
         self.fill_screen()
         self.step('e')
-        self.n_actions = 4
+        self.n_actions = 5
         self.n_features_x = MATRIX_WIDTH,
         self.n_features_y = MATRIX_HEIGHT
 
@@ -403,7 +403,7 @@ class Game(object):
         self.screen.blit(self.background, (0, 0))
 
         pygame.display.flip()
-        return self.get_matrix_state(), self.matris.lines, self.done
+        return self.get_matrix_state(), self.get_reward(), self.done
 
     def info_surf(self):
 
@@ -468,6 +468,15 @@ class Game(object):
 
     def destroy(self):
         pygame.quit()
+
+    def get_reward(self):
+        matrix = self.get_matrix_state()
+        score = 0
+        for line in matrix:
+            if 1 in line:
+                score += np.count_nonzero(line) - line.size
+        return score + self.matris.lines * 100
+
 
     def get_matrix_state(self):
         matrix_list = []

@@ -3,9 +3,11 @@ from DQN_modified import DeepQNetwork
 from game.matris import Game
 
 
-action_map = ['a', 's', 'd', 'j']
+action_map = ['a', 's', 'd', 'j', 'w']
+input_map = {'a':0, 's': 1, 'd': 2, 'w': 4, 'f': 3}
 
-MEMORY_ACCUMULATION = 10000
+MEMORY_ACCUMULATION = 5000
+manually_step = 0
 
 def run_maze():
     step = 0
@@ -43,19 +45,29 @@ def run_maze():
 
 def run_matris():
     step = 0
+    try:
+        RL.load_memory()
+    except:
+        pass
+    save_flag = True
     for episode in range(MEMORY_ACCUMULATION * 10000):
         observation = env.reset()
 
         while True:
-            print "Step: %s" % step
-            action = RL.choose_action(observation)
-            print action
-            observation_, reward, done = env.step([action_map[a] % env.n_actions for a in action])
+            if step < manually_step:
+                action = input_map.get(raw_input("action: "), 1)
+                # action = RL.choose_action(observation)
+            else:
+                if save_flag:
+                    RL.save_memory()
+                    save_flag = False
+                action = RL.choose_action(observation)
+            observation_, reward, done = env.step(action_map[action % env.n_actions])
             RL.store_transition(observation, action, reward, observation_)
-            if (step > MEMORY_ACCUMULATION) and (step % 500 == 0):
+            if (step > MEMORY_ACCUMULATION) and (step % 50 == 0):
                 RL.learn()
             observation = observation_
-
+            print "Step: %s\n Reward: %s\n Action: %s" % (step, reward, action)
             if done:
                 break
             step += 1
@@ -70,7 +82,7 @@ if __name__ == "__main__":
                       reward_decay=0.9,
                       e_greedy=0.5,
                       replace_target_iter=5000,
-                      memory_size=MEMORY_ACCUMULATION * 100,
+                      memory_size=MEMORY_ACCUMULATION * 10,
                       output_graph=False
                       )
     run_matris()
