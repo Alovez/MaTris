@@ -2,3 +2,7 @@
 .backups
 .highscores
 .idea/
+data.h5
+*.log
+logs/
+network/

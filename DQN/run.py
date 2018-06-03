@@ -50,7 +50,7 @@ def run_matris():
     except:
         pass
     save_flag = True
-    for episode in range(MEMORY_ACCUMULATION * 10000):
+    for episode in range(MEMORY_ACCUMULATION * 30000):
         observation = env.reset()
 
         while True:
@@ -59,9 +59,9 @@ def run_matris():
                 # action = RL.choose_action(observation)
             else:
                 if save_flag:
-                    RL.save_memory()
+                    # RL.save_memory()
                     save_flag = False
-                action = RL.choose_action(observation)
+            action = RL.choose_action(observation)
             observation_, reward, done = env.step(action_map[action % env.n_actions])
             RL.store_transition(observation, action, reward, observation_)
             if (step > MEMORY_ACCUMULATION) and (step % 50 == 0):
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     RL = DeepQNetwork(env.n_actions, env.n_features_x[0], env.n_features_y,
                       learning_rate=0.1,
                       reward_decay=0.9,
-                      e_greedy=0.5,
+                      e_greedy=0.1,
                       replace_target_iter=5000,
                       memory_size=MEMORY_ACCUMULATION * 10,
                       output_graph=False

@@ -149,7 +149,7 @@ class DeepQNetwork:
         q_next, q_eval = self.sess.run(
             [self.q_next, self.q_eval],
             feed_dict={
-                self.s_: batch_memory[:, -self.n_features:],  # fixed params
+                self.s_: batch_memory[:, 1 -self.n_features:],  # fixed params
                 self.s: batch_memory[:, :self.n_features],  # newest params
             })
 

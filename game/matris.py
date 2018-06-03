@@ -20,7 +20,7 @@ logger_count = {}
 def logger(message):
     now = datetime.now().strftime('%H:%M:%S')
     logger_count[message] = logger_count.get(message, 0) + 1
-    print now + ' |INFO| NO.%s %s' % (logger_count.get(message, 0), message)
+    print(now + ' |INFO| NO.%s %s' % (logger_count.get(message, 0), message))
 
 tetrominoes_dict = {
     'long': 0,
@@ -369,10 +369,12 @@ class Game(object):
         self.init_background()
         self.matris = Matris()
         self.fill_screen()
+        self.score = 0
         self.step('e')
         self.n_actions = 5
         self.n_features_x = MATRIX_WIDTH,
         self.n_features_y = MATRIX_HEIGHT
+
 
     def init_background(self):
         self.background = Surface(self.screen.get_size())
@@ -388,7 +390,6 @@ class Game(object):
         self.matris.update(0.3, action)
         if self.matris.gameover:
             self.done = True
-
         tricky_centerx = WIDTH - (WIDTH - (MATRIS_OFFSET + BLOCKSIZE * MATRIX_WIDTH + BORDERWIDTH * 2)) / 2
 
         self.background.blit(self.matris_border, (MATRIS_OFFSET, MATRIS_OFFSET))
@@ -471,11 +472,12 @@ class Game(object):
 
     def get_reward(self):
         matrix = self.get_matrix_state()
-        score = 0
+        score = self.matris.score - self.score
+        self.score = self.matris.score
         for line in matrix:
             if 1 in line:
                 score += np.count_nonzero(line) - line.size
-        return score + self.matris.lines * 100
+        return score
 
 
     def get_matrix_state(self):
@@ -527,11 +529,11 @@ def construct_nightmare(size):
 if __name__ == '__main__':
     env = Game()
     while True:
-        action = raw_input("action: ")
+        action = input("action: ")
         env.get_matrix_state()
         logger('Score: %s\tLines: %s\tCombo:%s' % env.step(action))
         if env.done:
-            start_new = raw_input('New Game(y/n)?')
+            start_new = input('New Game(y/n)?')
             if start_new == 'y':
                 env = Game()
             else:

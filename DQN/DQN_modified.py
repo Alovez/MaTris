@@ -62,7 +62,7 @@ class DeepQNetwork:
 
         self.saver = tf.train.Saver()
         try:
-            self.saver.restore(self.sess, "./net_work.ckpt")
+            self.saver.restore(self.sess, "./network/net_work.ckpt")
         except:
             print "Failed to RESTORE network"
 
@@ -94,7 +94,7 @@ class DeepQNetwork:
                                  bias_initializer=b_initializer, name='e4')
             e5 = tf.layers.dense(e4, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='e5')
-            self.q_eval = tf.layers.dense(e5, 1, kernel_initializer=w_initializer,
+            self.q_eval = tf.layers.dense(e5, self.n_actions, kernel_initializer=w_initializer,
                                           bias_initializer=b_initializer, name='q')
 
         # ------------------ build target_net ------------------
@@ -110,7 +110,7 @@ class DeepQNetwork:
                                  bias_initializer=b_initializer, name='t4')
             t5 = tf.layers.dense(t4, self.n_actions, tf.nn.relu, kernel_initializer=w_initializer,
                                  bias_initializer=b_initializer, name='t5')
-            self.q_next = tf.layers.dense(t5, 1, kernel_initializer=w_initializer,
+            self.q_next = tf.layers.dense(t5, self.n_actions, kernel_initializer=w_initializer,
                                           bias_initializer=b_initializer, name='t')
         with tf.variable_scope('q_target'):
             q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')  # shape=(?, 2)
@@ -140,7 +140,9 @@ class DeepQNetwork:
 
     def load_memory(self):
         with h5py.File('data.h5', 'r') as f:
-            self.memory = f['memory'][:]
+            memory = f['memory'][:]
+            empty_memory = np.zeros((self.memory_size - memory.shape[1], self.n_features_y * self.n_features_x * 2 + 2))
+            self.memory = np.concatenate((memory, empty_memory))
 
     def choose_action(self, observation):
         # to have batch dimension when feed into tf placeholder
@@ -151,7 +153,7 @@ class DeepQNetwork:
             actions_value = self.sess.run(self.q_eval, feed_dict={self.s: observation})
             action = np.argmax(actions_value)
         else:
-            action = np.random.choice([0,0,2,2,1,3,3,4], 1)[0]
+            action = np.random.choice([0,2,2,1,3,3,4], 1)[0]
         return action
 
     def learn(self):
@@ -160,7 +162,7 @@ class DeepQNetwork:
             self.sess.run(self.target_replace_op)
             print('\ntarget_params_replaced\n')
         if self.learn_step_counter % self.replace_target_iter * 100 == 0:
-            self.saver.save(self.sess, './net_work.ckpt')
+            self.saver.save(self.sess, './network/net_work.ckpt')
         # sample batch memory from all memory
         if self.memory_counter > self.memory_size:
             sample_index = np.random.choice(self.memory_size, size=self.batch_size)
